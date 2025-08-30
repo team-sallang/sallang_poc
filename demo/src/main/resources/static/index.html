@@ -3,172 +3,77 @@
 <head>
     <meta charset="UTF-8" />
     <title>Firebase Voice Chat</title>
+
+    <!-- ✅ Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- ✅ 우리 JS 코드 연결 -->
+    <script src="./app.js" defer></script>
+
     <style>
         body {
-            font-family: sans-serif;
-            margin: 30px;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
         }
-        .section {
-            margin-bottom: 20px;
-        }
-        .status {
-            padding: 10px;
-            margin-top: 10px;
-            border: 1px solid #ccc;
-            background: #f9f9f9;
-        }
+
         label {
-            display: inline-block;
-            width: 80px;
+            display: block;
+            margin-bottom: 8px;
         }
+
+        input {
+            margin-bottom: 12px;
+            padding: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-bottom: 20px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        h3 {
+            margin-top: 20px;
+        }
+
+        #status {
+            font-weight: bold;
+        }
+
         audio {
             display: block;
             margin-top: 10px;
         }
     </style>
 </head>
-<body>
-<h2>🎧 Firebase Signaling - Voice Chat</h2>
 
-<div class="section">
-    <label>Your ID:</label>
-    <input type="text" id="yourId" value="a">
-</div>
-<div class="section">
-    <label>Target ID:</label>
-    <input type="text" id="targetId" value="b">
-</div>
+<body>
+<h2>🎙 Firebase Signaling - Voice Chat</h2>
+
+<label>
+    Your ID:
+    <input type="text" id="yourId" />
+</label>
+
+<label>
+    Target ID:
+    <input type="text" id="targetId" />
+</label>
+
 <button onclick="startCall()">Start Call</button>
 
-<div class="status" id="statusBox">
-    <strong>Status:</strong>
-    <div id="statusText">🕓 Waiting...</div>
+<div>
+    <h3>Status:</h3>
+    <p id="status">🔘 Waiting...</p>
+
+    <h3>Your Audio:</h3>
+    <audio id="yourAudio" autoplay controls muted></audio>
+
+    <h3>Partner's Audio:</h3>
+    <audio id="partnerAudio" autoplay controls></audio>
 </div>
-
-<div class="section">
-    <strong>Your Audio:</strong>
-    <audio id="localAudio" autoplay muted></audio>
-</div>
-<div class="section">
-    <strong>Partner's Audio:</strong>
-    <audio id="remoteAudio" autoplay></audio>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyCLdrXmmOqJ25KRILzaVwgfXsvG-VfncoE",
-        authDomain: "sallang-80005.firebaseapp.com",
-        projectId: "sallang-80005",
-        storageBucket: "sallang-80005.firebasestorage.app",
-        messagingSenderId: "674931707999",
-        appId: "1:674931707999:web:bfe7d9ad737eebb7b48bea",
-        measurementId: "G-PNGVX7QXK1"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    const localAudio = document.getElementById('localAudio');
-    const remoteAudio = document.getElementById('remoteAudio');
-    const statusText = document.getElementById('statusText');
-
-    const peer = new RTCPeerConnection();
-    let yourId, targetId;
-
-    peer.ontrack = (event) => {
-        remoteAudio.srcObject = event.streams[0];
-        updateStatus("✅ Remote audio stream received.");
-    };
-
-    peer.oniceconnectionstatechange = () => {
-        updateStatus("🔄 ICE State: " + peer.iceConnectionState);
-        if (peer.iceConnectionState === "connected") {
-            updateStatus("✅ Voice chat connected!");
-        }
-    };
-
-    peer.onicecandidate = (event) => {
-        if (event.candidate) {
-            const msg = {
-                senderId: yourId,
-                receiverId: targetId,
-                type: "candidate",
-                sdp: JSON.stringify(event.candidate),
-            };
-            sendMessage(msg);
-        }
-    };
-
-    async function startCall() {
-        yourId = document.getElementById('yourId').value;
-        targetId = document.getElementById('targetId').value;
-
-        updateStatus("🎤 Requesting microphone...");
-
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-        localAudio.srcObject = stream;
-
-        updateStatus("📨 Sending offer...");
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
-
-        sendMessage({
-            senderId: yourId,
-            receiverId: targetId,
-            type: "offer",
-            sdp: JSON.stringify(offer),
-        });
-    }
-
-    function sendMessage(message) {
-        const room = ref(db, "calls/" + message.receiverId);
-        push(room, message);
-    }
-
-    function updateStatus(msg) {
-        statusText.innerText = msg;
-        console.log("[status]", msg);
-    }
-
-    function handleSignal(data) {
-        const { senderId: from, type, sdp } = data;
-
-        if (type === "offer") {
-            updateStatus("📨 Offer received. Answering...");
-            navigator.mediaDevices.getUserMedia({ audio: true }).then(async (stream) => {
-                stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-                localAudio.srcObject = stream;
-
-                await peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sdp)));
-                const answer = await peer.createAnswer();
-                await peer.setLocalDescription(answer);
-
-                sendMessage({
-                    senderId: yourId,
-                    receiverId: from,
-                    type: "answer",
-                    sdp: JSON.stringify(answer),
-                });
-            });
-        } else if (type === "answer") {
-            updateStatus("📩 Answer received. Finalizing connection...");
-            peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(sdp)));
-        } else if (type === "candidate") {
-            peer.addIceCandidate(new RTCIceCandidate(JSON.parse(sdp)));
-            updateStatus("🌐 ICE candidate added.");
-        }
-    }
-
-    window.onload = () => {
-        yourId = document.getElementById('yourId').value;
-        const listenRef = ref(db, "calls/" + yourId);
-        onChildAdded(listenRef, (data) => {
-            handleSignal(data.val());
-        });
-    };
-</script>
 </body>
 </html>
