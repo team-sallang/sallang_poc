@@ -19,7 +19,7 @@ public class FirebaseConfig {
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                .setDatabaseUrl("https://your-project-id.firebaseio.com") // ✅ 이 줄 반드시 포함
+                .setDatabaseUrl("https://sallang-80005.firebaseio.com") // ✅ 이 줄 반드시 포함
                 .build();
 
         if (FirebaseApp.getApps().isEmpty()) {
