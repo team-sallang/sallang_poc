@@ -5,6 +5,21 @@
     <title>Firebase Signaling - Voice Chat</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        .volume-container {
+            width: 300px;
+            height: 20px;
+            border: 1px solid black;
+            margin: 10px 0;
+        }
+        .volume-bar {
+            background-color: green;
+            height: 100%;
+            width: 0;
+            transition: width 0.1s ease-out;
+        }
+    </style>
 </head>
 <body>
 <h2>Firebase Signaling - Voice Chat</h2>
@@ -23,9 +38,17 @@
 <p id="status">Not connected</p>
 
 <h3>Your Audio:</h3>
+<p>Volume:</p>
+<div class="volume-container">
+    <div id="localVolumeBar" class="volume-bar"></div>
+</div>
 <audio id="localAudio" autoplay controls></audio>
 
 <h3>Partner's Audio:</h3>
+<p>Volume:</p>
+<div class="volume-container">
+    <div id="remoteVolumeBar" class="volume-bar"></div>
+</div>
 <audio id="remoteAudio" autoplay controls></audio>
 
 <script src="/app.js"></script>
