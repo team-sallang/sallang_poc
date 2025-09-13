@@ -10,3 +10,8 @@
 ```
 ws://<EC2_PUBLIC_IP>:4000/socket/websocket?apikey=<ANON_KEY>&vsn=1.0.0
 ```
+
+도커 실행법
+```
+docker compose -f docker-compose.coturnTest.yml up <옵션추가>
+```
