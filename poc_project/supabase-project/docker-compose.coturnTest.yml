@@ -1,12 +1,16 @@
+# Supabase 프로젝트 개발 환경 구성 파일
+# CoTURN 서버 테스트를 위한 설정이 포함된 Docker Compose 파일
 name: supabase-project
 
 services:
 
+  # Supabase Studio - 웹 기반 관리 대시보드
+  # 데이터베이스 스키마, API 관리, 인증 설정 등을 GUI로 관리할 수 있는 웹 인터페이스
   studio:
     container_name: supabase-studio
-    image: supabase/studio:2025.06.30-sha-6f5982d
-    restart: unless-stopped
-    healthcheck:
+    image: supabase/studio:2025.06.30-sha-6f5982d  # Supabase Studio 최신 이미지
+    restart: unless-stopped  # 컨테이너가 자동으로 재시작되도록 설정
+    healthcheck:  # 서비스 상태 확인을 위한 헬스체크 설정
       test:
         [
           "CMD",
@@ -14,46 +18,54 @@ services:
           "-e",
           "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
         ]
-      timeout: 10s
-      interval: 5s
-      retries: 3
-    depends_on:
+      timeout: 10s    # 헬스체크 타임아웃 (10초)
+      interval: 5s    # 헬스체크 간격 (5초마다)
+      retries: 3      # 실패 시 재시도 횟수
+    depends_on:       # 의존성 설정 - analytics 서비스가 준비된 후 시작
       analytics:
         condition: service_healthy
-    environment:
+    environment:  # Studio 서비스에 필요한 환경 변수들
+      # PostgreSQL 메타데이터 서비스 URL
       STUDIO_PG_META_URL: http://meta:8080
+      # PostgreSQL 데이터베이스 비밀번호
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
+      # Studio 기본 설정
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
       DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT}
+      # OpenAI API 키 (선택사항 - AI 기능용)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
+      # Supabase 서비스 연결 정보
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-      AUTH_JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_ANON_KEY: ${ANON_KEY}           # 익명 사용자용 API 키
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}  # 서비스용 API 키
+      AUTH_JWT_SECRET: ${JWT_SECRET}           # JWT 토큰 서명용 비밀키
 
+      # 로그 및 분석 서비스 설정
       LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
       LOGFLARE_URL: http://analytics:4000
       NEXT_PUBLIC_ENABLE_LOGS: true
-      # Comment to use Big Query backend for analytics
+      # PostgreSQL을 분석 백엔드로 사용 (기본값)
       NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
-      # Uncomment to use Big Query backend for analytics
+      # Big Query를 분석 백엔드로 사용하려면 아래 주석 해제
       # NEXT_ANALYTICS_BACKEND_PROVIDER: bigquery
 
+  # Supabase Realtime 서비스 - 실시간 데이터베이스 변경사항 구독 및 WebSocket 연결 관리
+  # 데이터베이스의 변경사항을 실시간으로 클라이언트에 전달하는 서비스
   realtime:
-    # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
+    # 컨테이너명이 일관성 없어 보이지만 정상임 (realtime이 서브도메인을 파싱하여 tenant id를 구성하기 때문)
     container_name: realtime-dev.supabase-realtime
-    image: supabase/realtime:v2.34.47
+    image: supabase/realtime:v2.34.47  # Supabase Realtime 최신 이미지
     restart: unless-stopped
-    depends_on:
+    depends_on:  # 의존성 설정
       db:
-        # Disable this if you are using an external Postgres database
+        # 외부 PostgreSQL 데이터베이스를 사용하는 경우 이 설정을 비활성화하세요
         condition: service_healthy
       analytics:
         condition: service_healthy
-    healthcheck:
+    healthcheck:  # Realtime 서비스 헬스체크 설정
       test:
         [
           "CMD",
@@ -66,66 +78,74 @@ services:
           "Authorization: Bearer ${ANON_KEY}",
           "http://localhost:4000/api/tenants/realtime-dev/health"
         ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      PORT: 4000
+      timeout: 5s    # 헬스체크 타임아웃
+      interval: 5s    # 헬스체크 간격
+      retries: 3      # 재시도 횟수
+    environment:  # Realtime 서비스 환경 변수
+      PORT: 4000  # Realtime 서비스 포트
+      # 데이터베이스 연결 설정
       DB_HOST: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
       DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
-      DB_ENC_KEY: supabaserealtime
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'  # 연결 후 스키마 설정
+      DB_ENC_KEY: supabaserealtime  # 데이터베이스 암호화 키
+      # 인증 및 보안 설정
       API_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
-      ERL_AFLAGS: -proto_dist inet_tcp
-      DNS_NODES: "''"
-      RLIMIT_NOFILE: "10000"
+      # Erlang/Elixir 런타임 설정
+      ERL_AFLAGS: -proto_dist inet_tcp  # Erlang 분산 노드 통신 설정
+      DNS_NODES: "''"  # DNS 노드 설정
+      RLIMIT_NOFILE: "10000"  # 파일 디스크립터 제한
       APP_NAME: realtime
-      SEED_SELF_HOST: true
-      RUN_JANITOR: true
+      SEED_SELF_HOST: true    # 자체 호스팅 모드
+      RUN_JANITOR: true       # 정리 작업 활성화
 
+  # PostgreSQL 데이터베이스 서비스 - Supabase의 핵심 데이터 저장소
+  # 모든 데이터와 사용자 정보를 저장하는 메인 데이터베이스
   db:
     container_name: supabase-db
-    image: supabase/postgres:15.8.1.060
+    image: supabase/postgres:15.8.1.060  # PostgreSQL 15.8.1 버전 (Supabase 확장 포함)
     restart: unless-stopped
-    volumes:
+    volumes:  # 데이터베이스 초기화 및 설정 파일들
+      # Realtime 기능을 위한 SQL 스크립트
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
-      # Must be superuser to create event trigger
+      # 웹훅 기능 (슈퍼유저 권한 필요 - 이벤트 트리거 생성용)
       - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
-      # Must be superuser to alter reserved role
+      # 사용자 역할 및 권한 설정 (슈퍼유저 권한 필요 - 예약된 역할 변경용)
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
-      # Initialize the database settings with JWT_SECRET and JWT_EXP
+      # JWT_SECRET과 JWT_EXP를 사용한 데이터베이스 설정 초기화
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
-      # PGDATA directory is persisted between restarts
+      # PGDATA 디렉토리 - 재시작 간 데이터 지속성을 위해 볼륨 마운트
       - ./volumes/db/data:/var/lib/postgresql/data:Z
-      # Changes required for internal supabase data such as _analytics
+      # Supabase 내부 데이터 (_analytics 등)를 위한 변경사항
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
-      # Changes required for Analytics support
+      # Analytics 지원을 위한 변경사항
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
-      # Changes required for Pooler support
+      # Pooler 지원을 위한 변경사항
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
-      # Use named volume to persist pgsodium decryption key between restarts
+      # 재시작 간 pgsodium 암호화 키 지속성을 위한 명명된 볼륨
       - db-config:/etc/postgresql-custom
-    healthcheck:
+    healthcheck:  # PostgreSQL 데이터베이스 헬스체크
       test:
         [
           "CMD",
-          "pg_isready",
+          "pg_isready",  # PostgreSQL 연결 상태 확인 명령어
           "-U",
-          "postgres",
+          "postgres",    # 사용자명
           "-h",
-          "localhost"
+          "localhost"    # 호스트
         ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      interval: 5s    # 헬스체크 간격
+      timeout: 5s     # 타임아웃
+      retries: 10     # 재시도 횟수
+    # Vector 서비스 의존성 (현재 주석 처리됨)
     #    depends_on:
     #      vector:
     #        condition: service_healthy
-    environment:
+    environment:  # PostgreSQL 환경 변수
+      # PostgreSQL 연결 설정
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: ${POSTGRES_PORT}
       POSTGRES_PORT: ${POSTGRES_PORT}
@@ -133,100 +153,113 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
       POSTGRES_DB: ${POSTGRES_DB}
+      # JWT 토큰 설정
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY}
-    command:
+    command:  # PostgreSQL 실행 명령어
       [
         "postgres",
         "-c",
-        "config_file=/etc/postgresql/postgresql.conf",
+        "config_file=/etc/postgresql/postgresql.conf",  # 설정 파일 지정
         "-c",
-        "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
+        "log_min_messages=fatal"  # Realtime 폴링 쿼리가 로그에 나타나지 않도록 로그 레벨 설정
       ]
 
+  # Supabase Analytics 서비스 - 로그 수집 및 분석을 위한 Logflare 기반 서비스
+  # 애플리케이션 로그, 메트릭, 이벤트 데이터를 수집하고 분석
   analytics:
     container_name: supabase-analytics
-    image: supabase/logflare:1.14.2
+    image: supabase/logflare:1.14.2  # Logflare 분석 서비스 이미지
     restart: unless-stopped
     ports:
-      - 4000:4000
-    # Uncomment to use Big Query backend for analytics
+      - 4000:4000  # Analytics 서비스 포트 (외부 접근 가능)
+    # Big Query 백엔드를 사용하려면 아래 주석 해제
     # volumes:
     #   - type: bind
     #     source: ${PWD}/gcloud.json
     #     target: /opt/app/rel/logflare/bin/gcloud.json
     #     read_only: true
-    healthcheck:
+    healthcheck:  # Analytics 서비스 헬스체크
       test:
         [
           "CMD",
           "curl",
           "http://localhost:4000/health"
         ]
-      timeout: 5s
-      interval: 5s
-      retries: 10
-    depends_on:
+      timeout: 5s    # 헬스체크 타임아웃
+      interval: 5s    # 헬스체크 간격
+      retries: 10     # 재시도 횟수
+    depends_on:  # 의존성 설정
       db:
-        # Disable this if you are using an external Postgres database
+        # 외부 PostgreSQL 데이터베이스를 사용하는 경우 이 설정을 비활성화하세요
         condition: service_healthy
-    environment:
+    environment:  # Analytics 서비스 환경 변수
+      # Logflare 노드 설정
       LOGFLARE_NODE_HOST: 127.0.0.1
+      # 데이터베이스 연결 설정
       DB_USERNAME: supabase_admin
       DB_DATABASE: _supabase
       DB_HOSTNAME: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_SCHEMA: _analytics
+      # Logflare 인증 토큰
       LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
       LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
-      LOGFLARE_SINGLE_TENANT: true
-      LOGFLARE_SUPABASE_MODE: true
-      LOGFLARE_MIN_CLUSTER_SIZE: 1
+      # Logflare 운영 모드 설정
+      LOGFLARE_SINGLE_TENANT: true      # 단일 테넌트 모드
+      LOGFLARE_SUPABASE_MODE: true      # Supabase 모드 활성화
+      LOGFLARE_MIN_CLUSTER_SIZE: 1      # 최소 클러스터 크기
 
-      # Comment variables to use Big Query backend for analytics
+      # PostgreSQL 백엔드를 사용하기 위한 변수들 (기본 설정)
       POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/_supabase
       POSTGRES_BACKEND_SCHEMA: _analytics
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
-      # Uncomment to use Big Query backend for analytics
+      # Big Query 백엔드를 사용하려면 아래 주석 해제하고 위의 PostgreSQL 변수들을 주석 처리하세요
       # GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
       # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
 
-  # Comment out everything below this point if you are using an external Postgres database
+  # 외부 PostgreSQL 데이터베이스를 사용하는 경우 아래 모든 내용을 주석 처리하세요
 
-#  vector:
-#    container_name: supabase-vector
-#    image: timberio/vector:0.28.1-alpine
-#    restart: unless-stopped
-#    volumes:
-#      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
-#      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
-#    healthcheck:
-#      test:
-#        [
-#          "CMD",
-#          "wget",
-#          "--no-verbose",
-#          "--tries=1",
-#          "--spider",
-#          "http://vector:9001/health"
-#        ]
-#      timeout: 5s
-#      interval: 5s
-#      retries: 3
-#    environment:
-#      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-#    command:
-#      [
-#        "--config",
-#        "/etc/vector/vector.yml"
-#      ]
-#    security_opt:
-#      - "label=disable"
-#
-#  # Update the DATABASE_URL if you are using an external Postgres database
+# Vector 로그 수집 서비스 (현재 비활성화됨)
+# 로그 파일과 메트릭을 수집하여 분석 서비스로 전송하는 역할
+  vector:
+    container_name: supabase-vector
+    image: timberio/vector:0.28.1-alpine  # Vector 로그 수집 도구
+    restart: unless-stopped
+    volumes:
+      # Vector 설정 파일
+      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
+      # Docker 소켓 마운트 (컨테이너 로그 수집용)
+      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://vector:9001/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+    command:
+      [
+        "--config",
+        "/etc/vector/vector.yml"
+      ]
+    security_opt:
+      - "label=disable"
+
+  # 외부 Postgres 데이터베이스를 사용하는 경우 DATABASE_URL을 업데이트하세요
 
 ####################################################
+# CoTURN 서버 설정 (주석 처리된 버전 - host 네트워크 모드 사용)
+# NAT 우회 및 UDP relay를 위한 설정이지만 보안상 권장하지 않음
 #  coturn:
 #    container_name: coturn
 #    image: instrumentisto/coturn:latest
@@ -237,17 +270,19 @@ services:
 #    command: ["--config", "/etc/coturn/turnserver.conf"]
 ####################################################
 
-
+  # CoTURN TURN/STUN 서버 - WebRTC 미디어 릴레이를 위한 서비스
+  # NAT 환경에서 WebRTC 연결을 중계하는 서버로, 비디오/음성 통화에 필수
   coturn:
     container_name: coturn
-    image: instrumentisto/coturn:latest
+    image: instrumentisto/coturn:latest  # CoTURN 최신 이미지
     restart: unless-stopped
     ports:
-      - "3478:3478/udp"
+      - "3478:3478/udp"  # TURN/STUN 서버 기본 포트 (UDP)
     volumes:
+      # CoTURN 설정 파일 마운트
       - ./coturn.conf:/etc/coturn/turnserver.conf
-    command: ["turnserver", "-c", "/etc/coturn/turnserver.conf"]
+    command: ["turnserver", "-c", "/etc/coturn/turnserver.conf"]  # 설정 파일로 서버 실행
 
-
+# Docker 볼륨 정의
 volumes:
-  db-config:
+  db-config:  # PostgreSQL 설정 및 암호화 키를 위한 영구 볼륨
