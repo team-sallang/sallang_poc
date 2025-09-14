@@ -6,9 +6,11 @@
   - 메시지 구조는 JSON
 
 - WebSocket을 통한 signaling
+  - websocket 연결 url
 ```
-websocket 연결 url = ws://<EC2_PUBLIC_IP>:4000/socket/websocket?apikey=<ANON_KEY>&vsn=1.0.0
+ws://<EC2_PUBLIC_IP>:4000/socket/websocket?apikey=<ANON_KEY>&vsn=1.0.0
 ```
+
 
 - ICE서버 설정 예시(클라이언트 단)
 ```
@@ -23,4 +25,10 @@ const iceServers = [
     credential: '<HMAC-based-credential>'
   }
 ];
+```
+  
+  
+도커 실행법
+```
+docker compose -f docker-compose.coturnTest.yml up <옵션추가>
 ```
