@@ -9,3 +9,18 @@
 ```
 websocket 연결 url = ws://<EC2_PUBLIC_IP>:4000/socket/websocket?apikey=<ANON_KEY>&vsn=1.0.0
 ```
+
+- ICE서버 설정 예시(클라이언트 단)
+```
+const iceServers = [
+  {
+    urls: [
+      'stun:<EC2_PUBLIC_IP>:3478',
+      'turn:<EC2_PUBLIC_IP>:3478?transport=udp',
+      'turn:<EC2_PUBLIC_IP>:3478?transport=tcp'
+    ],
+    username: 'user',
+    credential: '<HMAC-based-credential>'
+  }
+];
+```
