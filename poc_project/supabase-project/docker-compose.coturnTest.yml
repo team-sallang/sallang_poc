@@ -52,6 +52,51 @@ services:
       # Big Query를 분석 백엔드로 사용하려면 아래 주석 해제
       # NEXT_ANALYTICS_BACKEND_PROVIDER: bigquery
 
+  # Kong API 게이트웨이 - Supabase API 요청을 라우팅하는 서비스
+  # 모든 API 요청을 적절한 백엔드 서비스로 전달하는 역할
+  kong:
+    container_name: supabase-kong
+    image: kong:2.8.1  # Kong API 게이트웨이 이미지
+    restart: unless-stopped
+    ports:
+      - "8000:8000/tcp"  # HTTP API 포트
+      - "8443:8443/tcp"  # HTTPS API 포트
+    volumes:
+      # Kong 설정 파일 마운트
+      - ./volumes/api/kong.yml:/home/kong/temp.yml:ro,z
+    depends_on:  # 의존성 설정
+      analytics:
+        condition: service_healthy
+    environment:  # Kong 환경 변수
+      KONG_DATABASE: "off"  # 데이터베이스 없이 설정 파일 사용
+      KONG_DECLARATIVE_CONFIG: /home/kong/temp.yml  # 설정 파일 경로
+      KONG_PROXY_ACCESS_LOG: /dev/stdout  # 프록시 액세스 로그
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout  # 관리자 액세스 로그
+      KONG_PROXY_ERROR_LOG: /dev/stderr  # 프록시 오류 로그
+      KONG_ADMIN_ERROR_LOG: /dev/stderr  # 관리자 오류 로그
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001  # 관리자 인터페이스 포트
+
+  # PostgREST 서비스 - PostgreSQL 데이터베이스를 REST API로 노출하는 서비스
+  # 데이터베이스 테이블을 자동으로 REST 엔드포인트로 변환
+  rest:
+    container_name: supabase-rest
+    image: postgrest/postgrest:v12.2.12  # PostgREST 최신 이미지
+    restart: unless-stopped
+    depends_on:  # 의존성 설정
+      db:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+    environment:  # PostgREST 환경 변수
+      # 데이터베이스 연결 설정
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
+
   # Supabase Realtime 서비스 - 실시간 데이터베이스 변경사항 구독 및 WebSocket 연결 관리
   # 데이터베이스의 변경사항을 실시간으로 클라이언트에 전달하는 서비스
   realtime:
@@ -108,6 +153,8 @@ services:
     container_name: supabase-db
     image: supabase/postgres:15.8.1.060  # PostgreSQL 15.8.1 버전 (Supabase 확장 포함)
     restart: unless-stopped
+    ports:
+      - "5432:5432"  # PostgreSQL 포트 노출
     volumes:  # 데이터베이스 초기화 및 설정 파일들
       # Realtime 기능을 위한 SQL 스크립트
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
@@ -120,7 +167,7 @@ services:
       # PGDATA 디렉토리 - 재시작 간 데이터 지속성을 위해 볼륨 마운트
       - ./volumes/db/data:/var/lib/postgresql/data:Z
       # Supabase 내부 데이터 (_analytics 등)를 위한 변경사항
-      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
+      - ./volumes/db/00-_supabase.sql:/docker-entrypoint-initdb.d/init-scripts/00-_supabase.sql:Z
       # Analytics 지원을 위한 변경사항
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
       # Pooler 지원을 위한 변경사항
@@ -159,6 +206,9 @@ services:
     command:  # PostgreSQL 실행 명령어
       [
         "postgres",
+        "-c",
+        "port=5432", # 수동으로 포트를 설정함. 이후 해당 부분 수정해야 함.
+        
         "-c",
         "config_file=/etc/postgresql/postgresql.conf",  # 설정 파일 지정
         "-c",
@@ -223,37 +273,37 @@ services:
 
 # Vector 로그 수집 서비스 (현재 비활성화됨)
 # 로그 파일과 메트릭을 수집하여 분석 서비스로 전송하는 역할
-  vector:
-    container_name: supabase-vector
-    image: timberio/vector:0.28.1-alpine  # Vector 로그 수집 도구
-    restart: unless-stopped
-    volumes:
-      # Vector 설정 파일
-      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
-      # Docker 소켓 마운트 (컨테이너 로그 수집용)
-      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://vector:9001/health"
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-    command:
-      [
-        "--config",
-        "/etc/vector/vector.yml"
-      ]
-    security_opt:
-      - "label=disable"
+  # vector:
+  #   container_name: supabase-vector
+  #   image: timberio/vector:0.28.1-alpine  # Vector 로그 수집 도구
+  #   restart: unless-stopped
+  #   volumes:
+  #     # Vector 설정 파일
+  #     - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
+  #     # Docker 소켓 마운트 (컨테이너 로그 수집용)
+  #     - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD",
+  #         "wget",
+  #         "--no-verbose",
+  #         "--tries=1",
+  #         "--spider",
+  #         "http://vector:9001/health"
+  #       ]
+  #     timeout: 5s
+  #     interval: 5s
+  #     retries: 3
+  #   environment:
+  #     LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+  #   command:
+  #     [
+  #       "--config",
+  #       "/etc/vector/vector.yml"
+  #     ]
+  #   security_opt:
+  #     - "label=disable"
 
   # 외부 Postgres 데이터베이스를 사용하는 경우 DATABASE_URL을 업데이트하세요
 
