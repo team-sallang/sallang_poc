@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 연결 테스트</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 WebRTC 연결 테스트 도구</h1>
+    
+    <div class="test-section">
+        <h2>1. Supabase 연결 테스트</h2>
+        <button onclick="testSupabaseConnection()">Supabase 연결 테스트</button>
+        <div id="supabase-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 데이터베이스 테이블 확인</h2>
+        <button onclick="testDatabaseTables()">테이블 존재 확인</button>
+        <div id="database-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Realtime 채널 테스트</h2>
+        <button onclick="testRealtimeChannel()">Realtime 채널 테스트</button>
+        <div id="realtime-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. WebRTC 설정 테스트</h2>
+        <button onclick="testWebRTCConfig()">WebRTC 설정 테스트</button>
+        <div id="webrtc-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 마이크 권한 테스트</h2>
+        <button onclick="testMicrophoneAccess()">마이크 권한 테스트</button>
+        <div id="microphone-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>6. 전체 테스트 실행</h2>
+        <button onclick="runAllTests()">모든 테스트 실행</button>
+        <div id="overall-status" class="status info">테스트 대기 중...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 테스트 로그</h2>
+        <div id="test-log" class="log">테스트 로그가 여기에 표시됩니다...\n</div>
+    </div>
+
+    <script>
+        // Supabase 설정
+        const SUPABASE_URL = 'http://localhost:8000';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+        
+        let supabase = null;
+        let testResults = {};
+
+        // 로그 함수
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('test-log');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // 상태 업데이트 함수
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+        }
+
+        // 1. Supabase 연결 테스트
+        async function testSupabaseConnection() {
+            log('Supabase 연결 테스트 시작...');
+            updateStatus('supabase-status', '연결 테스트 중...', 'info');
+            
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // 간단한 쿼리로 연결 테스트
+                const { data, error } = await supabase
+                    .from('webrtc_rooms')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                log('Supabase 연결 성공!', 'success');
+                updateStatus('supabase-status', '✅ 연결 성공', 'success');
+                testResults.supabase = true;
+                
+            } catch (error) {
+                log(`Supabase 연결 실패: ${error.message}`, 'error');
+                updateStatus('supabase-status', `❌ 연결 실패: ${error.message}`, 'error');
+                testResults.supabase = false;
+            }
+        }
+
+        // 2. 데이터베이스 테이블 확인
+        async function testDatabaseTables() {
+            log('데이터베이스 테이블 확인 시작...');
+            updateStatus('database-status', '테이블 확인 중...', 'info');
+            
+            try {
+                if (!supabase) {
+                    throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+                }
+
+                const tables = ['webrtc_signaling', 'webrtc_rooms'];
+                let allTablesExist = true;
+                
+                for (const table of tables) {
+                    try {
+                        const { data, error } = await supabase
+                            .from(table)
+                            .select('*')
+                            .limit(1);
+                        
+                        if (error) {
+                            throw error;
+                        }
+                        
+                        log(`테이블 '${table}' 존재 확인`, 'success');
+                    } catch (error) {
+                        log(`테이블 '${table}' 확인 실패: ${error.message}`, 'error');
+                        allTablesExist = false;
+                    }
+                }
+                
+                if (allTablesExist) {
+                    log('모든 테이블 확인 완료!', 'success');
+                    updateStatus('database-status', '✅ 모든 테이블 존재', 'success');
+                    testResults.database = true;
+                } else {
+                    log('일부 테이블이 없습니다.', 'error');
+                    updateStatus('database-status', '❌ 일부 테이블 누락', 'error');
+                    testResults.database = false;
+                }
+                
+            } catch (error) {
+                log(`데이터베이스 테이블 확인 실패: ${error.message}`, 'error');
+                updateStatus('database-status', `❌ 확인 실패: ${error.message}`, 'error');
+                testResults.database = false;
+            }
+        }
+
+        // 3. Realtime 채널 테스트
+        async function testRealtimeChannel() {
+            log('Realtime 채널 테스트 시작...');
+            updateStatus('realtime-status', '채널 테스트 중...', 'info');
+            
+            try {
+                if (!supabase) {
+                    throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+                }
+
+                const channel = supabase
+                    .channel('test-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'webrtc_signaling'
+                    }, (payload) => {
+                        log('Realtime 메시지 수신 성공!', 'success');
+                    })
+                    .subscribe();
+
+                // 2초 후 구독 해제
+                setTimeout(async () => {
+                    await supabase.removeChannel(channel);
+                    log('Realtime 채널 테스트 완료', 'success');
+                    updateStatus('realtime-status', '✅ 채널 구독 성공', 'success');
+                    testResults.realtime = true;
+                }, 2000);
+                
+            } catch (error) {
+                log(`Realtime 채널 테스트 실패: ${error.message}`, 'error');
+                updateStatus('realtime-status', `❌ 채널 테스트 실패: ${error.message}`, 'error');
+                testResults.realtime = false;
+            }
+        }
+
+        // 4. WebRTC 설정 테스트
+        async function testWebRTCConfig() {
+            log('WebRTC 설정 테스트 시작...');
+            updateStatus('webrtc-status', 'WebRTC 설정 확인 중...', 'info');
+            
+            try {
+                // WebRTC 지원 확인
+                if (!window.RTCPeerConnection) {
+                    throw new Error('WebRTC가 지원되지 않습니다.');
+                }
+                
+                log('WebRTC 지원 확인', 'success');
+                
+                // ICE 서버 설정 테스트
+                const rtcConfig = {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        {
+                            urls: 'turn:localhost:3478',
+                            username: 'testuser',
+                            credential: 'testpass'
+                        }
+                    ]
+                };
+                
+                const peerConnection = new RTCPeerConnection(rtcConfig);
+                
+                // ICE 후보 수집 테스트
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log('ICE 후보 수집 성공', 'success');
+                    }
+                };
+                
+                // 연결 상태 확인
+                peerConnection.onconnectionstatechange = () => {
+                    log(`연결 상태: ${peerConnection.connectionState}`, 'info');
+                };
+                
+                // 테스트용 오퍼 생성
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                log('WebRTC 설정 테스트 완료!', 'success');
+                updateStatus('webrtc-status', '✅ WebRTC 설정 정상', 'success');
+                testResults.webrtc = true;
+                
+                // 정리
+                peerConnection.close();
+                
+            } catch (error) {
+                log(`WebRTC 설정 테스트 실패: ${error.message}`, 'error');
+                updateStatus('webrtc-status', `❌ WebRTC 테스트 실패: ${error.message}`, 'error');
+                testResults.webrtc = false;
+            }
+        }
+
+        // 5. 마이크 권한 테스트
+        async function testMicrophoneAccess() {
+            log('마이크 권한 테스트 시작...');
+            updateStatus('microphone-status', '마이크 권한 확인 중...', 'info');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                log('마이크 접근 성공!', 'success');
+                updateStatus('microphone-status', '✅ 마이크 접근 성공', 'success');
+                testResults.microphone = true;
+                
+                // 스트림 정리
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (error) {
+                log(`마이크 접근 실패: ${error.message}`, 'error');
+                updateStatus('microphone-status', `❌ 마이크 접근 실패: ${error.message}`, 'error');
+                testResults.microphone = false;
+            }
+        }
+
+        // 6. 전체 테스트 실행
+        async function runAllTests() {
+            log('=== 전체 테스트 시작 ===');
+            updateStatus('overall-status', '전체 테스트 실행 중...', 'info');
+            
+            testResults = {};
+            
+            await testSupabaseConnection();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testDatabaseTables();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testRealtimeChannel();
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            await testWebRTCConfig();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await testMicrophoneAccess();
+            
+            // 결과 요약
+            const passedTests = Object.values(testResults).filter(result => result === true).length;
+            const totalTests = Object.keys(testResults).length;
+            
+            log(`=== 테스트 완료: ${passedTests}/${totalTests} 통과 ===`);
+            
+            if (passedTests === totalTests) {
+                updateStatus('overall-status', `✅ 모든 테스트 통과 (${passedTests}/${totalTests})`, 'success');
+            } else {
+                updateStatus('overall-status', `⚠️ 일부 테스트 실패 (${passedTests}/${totalTests})`, 'warning');
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            log('WebRTC 연결 테스트 도구 초기화 완료');
+            log('각 테스트 버튼을 클릭하거나 "모든 테스트 실행"을 클릭하세요.');
+        });
+    </script>
+</body>
+</html>

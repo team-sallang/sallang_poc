@@ -1,8 +1,8 @@
-# WebRTC 음성 통화 시스템 (Supabase Realtime 시그널링)
+# WebRTC 음성 통화 클라이언트
 
-Supabase Realtime을 시그널링 서버로 사용하는 WebRTC 음성 통화 시스템입니다.
+Supabase Realtime을 시그널링 서버로 사용하는 WebRTC 클라이언트입니다.
 
-## 🚀 주요 기능
+## 🚀 기능
 
 - **실시간 음성 통화**: WebRTC를 통한 P2P 음성 통화
 - **Supabase Realtime 시그널링**: PostgreSQL 기반 실시간 시그널링
@@ -18,25 +18,55 @@ Supabase Realtime을 시그널링 서버로 사용하는 WebRTC 음성 통화 �
 - **데이터베이스**: PostgreSQL
 - **TURN 서버**: CoTURN
 
-## 📋 프로젝트 구조
+## 📋 사전 요구사항
 
-```
-poc_project/supabase-project/
-├── webrtc-client/                 # WebRTC 클라이언트
-│   ├── index.html                 # 메인 HTML 파일
-│   ├── style.css                  # 스타일시트
-│   ├── client.js                  # WebRTC 클라이언트 로직
-│   ├── supabase-config.js         # Supabase 설정
-│   └── README.md                  # 클라이언트 사용법
-├── docker-compose.yml             # Supabase 인프라
-├── docker-compose.coturnTest.yml  # CoTURN 서버
-├── coturn.conf                    # CoTURN 설정
-├── test-webrtc.sh                 # Linux/Mac 통합 테스트
-├── test-webrtc.bat                # Windows 통합 테스트
-└── dev/data.sql                   # 데이터베이스 스키마
+1. **Supabase 인프라 실행**
+
+   ```bash
+   cd poc_project/supabase-project
+   docker compose up
+   ```
+
+2. **CoTURN 서버 실행**
+
+   ```bash
+   docker compose -f docker-compose.coturnTest.yml up
+   ```
+
+3. **HTTPS 환경** (WebRTC는 HTTPS에서만 작동)
+   - 로컬 개발: `localhost` 사용
+   - 프로덕션: SSL 인증서 필요
+
+## 🧪 자동 테스트
+
+프로젝트에는 환경 상태를 자동으로 확인하는 테스트 스크립트가 포함되어 있습니다.
+
+### Windows 환경
+
+```bash
+# 프로젝트 루트에서 실행
+test-webrtc.bat
 ```
 
-## 🚀 빠른 시작
+### Linux/macOS 환경
+
+```bash
+# 프로젝트 루트에서 실행
+chmod +x test-webrtc.sh
+./test-webrtc.sh
+```
+
+### 테스트 항목
+
+- ✅ Supabase 인프라 상태 확인
+- ✅ CoTURN 서버 상태 확인
+- ✅ 데이터베이스 연결 테스트
+- ✅ WebRTC 테이블 존재 확인
+- ✅ Realtime 서비스 상태 확인
+- ✅ CoTURN 서버 포트 연결 테스트
+- ✅ 클라이언트 파일 존재 확인
+
+## 🚀 사용 방법
 
 ### 1. 인프라 시작
 
@@ -46,62 +76,67 @@ cd poc_project/supabase-project
 docker compose -f docker-compose.coturnTest.yml up -d
 ```
 
-### 2. 통합 테스트 실행
+### 2. VS Code Live Server 설정
 
-**Linux/Mac:**
+1. **Live Server 확장 설치**
 
-```bash
-chmod +x test-webrtc.sh
-./test-webrtc.sh
-```
+   - VS Code에서 `Ctrl+Shift+X` (확장 탭 열기)
+   - "Live Server" 검색 후 설치
 
-**Windows:**
+2. **클라이언트 실행**
 
-```cmd
-test-webrtc.bat
-```
+   - `webrtc-client` 폴더를 VS Code에서 열기
+   - `index.html` 파일을 우클릭
+   - "Open with Live Server" 선택
+   - 브라우저에서 자동으로 열림
 
-### 3. WebRTC 클라이언트 시작
+3. **통화 테스트**
+   - 방 ID와 사용자 ID 입력
+   - "방 참여" 버튼 클릭
 
-**VS Code Live Server 사용 (권장):**
+### 3. 통화 테스트
 
-1. VS Code에서 "Live Server" 확장 설치
-2. `webrtc-client` 폴더를 VS Code에서 열기
-3. `index.html` 우클릭 → "Open with Live Server"
-4. 브라우저에서 자동으로 열림 (기본 포트: 5500)
+1. **같은 브라우저**: 두 개의 탭으로 테스트
+2. **다른 브라우저**: 다른 브라우저에서 접속
+3. **다른 기기**: 네트워크를 통한 테스트
 
-**또는 간단한 HTTP 서버:**
+## 🔧 Live Server 설정 팁
 
-```bash
-cd webrtc-client
-python -m http.server 8080
-```
+### HTTPS 설정 (선택사항)
+
+- Live Server는 기본적으로 HTTP로 실행됩니다
+- `localhost`에서는 WebRTC가 정상 작동합니다
+- HTTPS가 필요한 경우 Live Server 설정에서 SSL 인증서를 설정할 수 있습니다
+
+### 포트 변경
+
+- 기본 포트: 5500
+- 설정에서 포트 변경 가능
+- 여러 프로젝트를 동시에 실행할 때 유용
 
 ## 🔧 설정
 
 ### Supabase 설정
 
-`webrtc-client/supabase-config.js`에서 연결 정보 수정:
+`supabase-config.js`에서 Supabase 연결 정보를 수정:
 
 ```javascript
-const SUPABASE_CONFIG = {
-  url: "http://localhost:8000",
-  anonKey: "your-anon-key",
-};
+const SUPABASE_URL = "http://localhost:8000";
+const SUPABASE_ANON_KEY = "your-anon-key";
 ```
 
 ### TURN 서버 설정
 
-`webrtc-client/client.js`에서 TURN 서버 정보 수정:
+`client.js`에서 TURN 서버 정보를 수정:
 
 ```javascript
 const RTC_CONFIG = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     {
-      urls: "turn:localhost:3478",
-      username: "testuser",
-      credential: "testpass",
+      urls: "turn:your-turn-server:3478",
+      username: "your-username",
+      credential: "your-password",
     },
   ],
 };
@@ -161,13 +196,13 @@ CREATE TABLE webrtc_rooms (
 
 ### 연결 실패
 
-- TURN 서버 상태 확인: `docker compose -f docker-compose.coturnTest.yml ps`
+- TURN 서버 상태 확인
 - 방화벽 설정 확인
 - 네트워크 연결 상태 확인
 
 ### 시그널링 오류
 
-- Supabase Realtime 서비스 상태 확인: `curl http://localhost:4000/health`
+- Supabase Realtime 서비스 상태 확인
 - 데이터베이스 연결 상태 확인
 
 ## 📝 개발 로그
@@ -191,11 +226,11 @@ CREATE TABLE webrtc_rooms (
 - [x] 인증 구현 (static-auth-secret)
 - [x] 릴레이 연결 테스트
 
-### Phase 4: 테스트 및 최적화 ✅
+### Phase 4: 테스트 및 최적화
 
-- [x] 다중 클라이언트 테스트
-- [x] 에러 핸들링 개선
-- [x] 연결 품질 모니터링
+- [ ] 다중 클라이언트 테스트
+- [ ] 에러 핸들링 개선
+- [ ] 연결 품질 모니터링
 
 ## 🤝 기여
 
@@ -207,4 +242,4 @@ CREATE TABLE webrtc_rooms (
 
 ## 📄 라이선스
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
