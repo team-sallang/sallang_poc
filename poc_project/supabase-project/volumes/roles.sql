@@ -1,3 +1,6 @@
+-- 간소화버전 생성
+-- 이러면 모든 요청이 anon권한으로 실행돼서 별도 인증없이도 insert/select로 가능해짐
+
 -- 익명 사용자 롤
 create role anon nologin;
 
