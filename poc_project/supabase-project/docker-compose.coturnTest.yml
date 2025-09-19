@@ -65,8 +65,7 @@ services:
       # Kong 설정 파일 마운트
       - ./volumes/api/kong.yml:/home/kong/temp.yml:ro,z
     depends_on:  # 의존성 설정
-      analytics:
-        condition: service_healthy
+      - analytics
     environment:  # Kong 환경 변수
       KONG_DATABASE: "off"  # 데이터베이스 없이 설정 파일 사용
       KONG_DECLARATIVE_CONFIG: /home/kong/temp.yml  # 설정 파일 경로
@@ -83,10 +82,8 @@ services:
     image: postgrest/postgrest:v12.2.12  # PostgREST 최신 이미지
     restart: unless-stopped
     depends_on:  # 의존성 설정
-      db:
-        condition: service_healthy
-      analytics:
-        condition: service_healthy
+      - db
+      - analytics
     environment:  # PostgREST 환경 변수
       # 데이터베이스 연결 설정
       PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -173,6 +170,13 @@ services:
       # Pooler 지원을 위한 변경사항
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
       # 재시작 간 pgsodium 암호화 키 지속성을 위한 명명된 볼륨
+
+      - ./volumes/db/20-profiles.sql:/docker-entrypoint-initdb.d/init-scripts/20-profiles.sql:Z
+      - ./volumes/db/21-webrtc.sql:/docker-entrypoint-initdb.d/init-scripts/21-webrtc.sql:Z
+      - ./volumes/db/22-storage.sql:/docker-entrypoint-initdb.d/init-scripts/22-storage.sql:Z
+      # 새로 추가한 스크립트 매핑(data.sql대체)
+
+
       - db-config:/etc/postgresql-custom
     healthcheck:  # PostgreSQL 데이터베이스 헬스체크
       test:
@@ -208,7 +212,7 @@ services:
         "postgres",
         "-c",
         "port=5432", # 수동으로 포트를 설정함. 이후 해당 부분 수정해야 함.
-        
+
         "-c",
         "config_file=/etc/postgresql/postgresql.conf",  # 설정 파일 지정
         "-c",
@@ -248,7 +252,7 @@ services:
       LOGFLARE_NODE_HOST: 127.0.0.1
       # 데이터베이스 연결 설정
       DB_USERNAME: supabase_admin
-      DB_DATABASE: _supabase
+      DB_DATABASE: realtime
       DB_HOSTNAME: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -262,7 +266,7 @@ services:
       LOGFLARE_MIN_CLUSTER_SIZE: 1      # 최소 클러스터 크기
 
       # PostgreSQL 백엔드를 사용하기 위한 변수들 (기본 설정)
-      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/_supabase
+      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/realtime
       POSTGRES_BACKEND_SCHEMA: _analytics
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
       # Big Query 백엔드를 사용하려면 아래 주석 해제하고 위의 PostgreSQL 변수들을 주석 처리하세요

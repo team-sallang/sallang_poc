@@ -5,7 +5,7 @@
 create role anon nologin;
 
 -- PostgREST 연결용 롤 (비번 아무거나)
-create role authenticator login password 'authpass';
+create role authenticator login password '${POSTGRES_PASSWORD}';
 
 -- anon 권한 부여
 grant usage on schema public to anon;

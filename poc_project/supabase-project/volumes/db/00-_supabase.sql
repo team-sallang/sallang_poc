@@ -3,6 +3,14 @@
 -- 의존성 - roles/jwt/realtime/logs 스크립트
 -- Studio/Realtime/Analytics가 이 스크립트 사용
 
+DO $$
+BEGIN
+   IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '_supabase') THEN
+      PERFORM dblink_exec('dbname=' || current_database(), 'CREATE DATABASE "_supabase"');
+END IF;
+END
+$$ LANGUAGE plpgsql;
+
 -- 내부 관리/메타 스키마들 (존재하지 않으면 생성)
 create schema if not exists _supabase;   -- Studio/웹훅 등 내부 메타 테이블 보관
 create schema if not exists _analytics;  -- 로그/메트릭 적재
