@@ -86,7 +86,8 @@ services:
       - analytics
     environment:  # PostgREST 환경 변수
       # 데이터베이스 연결 설정
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+#      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://authenticator:mypassWord@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
@@ -175,6 +176,9 @@ services:
       - ./volumes/db/21-webrtc.sql:/docker-entrypoint-initdb.d/init-scripts/21-webrtc.sql:Z
       - ./volumes/db/22-storage.sql:/docker-entrypoint-initdb.d/init-scripts/22-storage.sql:Z
       # 새로 추가한 스크립트 매핑(data.sql대체)
+
+      - ./volumes/db/99-logflare.sql:/docker-entrypoint-initdb.d/init-scripts/99-logflare.sql:Z
+      # analytics 스키마 스크립트
 
 
       - db-config:/etc/postgresql-custom
