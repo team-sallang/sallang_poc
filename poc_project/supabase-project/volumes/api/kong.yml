@@ -1,0 +1,10 @@
+_format_version: "2.1"
+
+services:
+  - name: supabase-rest
+    url: http://rest:3000
+    routes:
+      - name: supabase-api-route
+        paths:
+          - /api
+        strip_path: true
